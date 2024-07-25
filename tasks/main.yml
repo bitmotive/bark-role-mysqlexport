@@ -1,0 +1,108 @@
+---
+# ROLE: MYSQLEXPORT
+#
+# DESCRIPTION:
+# This role is used for automating the DB dump from a remote server 
+# to the localhost where Ansible is running. 
+
+
+###############################################################################
+################### VARIABLE INITIALIZATION & TASK SETUP ######################
+###############################################################################
+
+
+# MYSQLEXPORT_DB_NAME
+# The name of the DB to be exported
+- name: MYSQLEXPORT_DB_NAME set fact from env if possible
+  set_fact:
+    MYSQLEXPORT_DB_NAME: "{{ lookup('env', 'MYSQLEXPORT_DB_NAME') | default('') | trim }}"
+  when: lookup('env', 'MYSQLEXPORT_DB_NAME') | default('', true) | trim != ''
+- name: MYSQLEXPORT_DB_NAME prompt user input if unset
+  pause:
+    prompt: "SET MYSQLEXPORT_DB_NAME"
+    echo: yes
+  register: input
+  when: MYSQLEXPORT_DB_NAME is not defined
+- name: Set MYSQLEXPORT_DB_NAME fact from user input
+  set_fact:
+    MYSQLEXPORT_DB_NAME: "{{ input.user_input | default('') | trim }}"
+  when: MYSQLEXPORT_DB_NAME is not defined
+
+# MYSQLEXPORT_DB_USER
+# The username of the role with access to the DB to export
+- name: MYSQLEXPORT_DB_USER set fact from env if possible
+  set_fact:
+    MYSQLEXPORT_DB_USER: "{{ lookup('env', 'MYSQLEXPORT_DB_USER') | default('') | trim }}"
+  when: lookup('env', 'MYSQLEXPORT_DB_USER') | default('', true) | trim != ''
+- name: MYSQLEXPORT_DB_USER prompt user input if unset
+  pause:
+    prompt: "SET MYSQLEXPORT_DB_USER"
+    echo: yes
+  register: input
+  when: MYSQLEXPORT_DB_USER is not defined
+- name: Set MYSQLEXPORT_DB_USER fact from user input
+  set_fact:
+    MYSQLEXPORT_DB_USER: "{{ input.user_input | default('') | trim }}"
+  when: MYSQLEXPORT_DB_USER is not defined
+
+# MYSQLEXPORT_DB_USER_PASSWORD
+# The pasword for the user with permissions to export the DB
+- name: MYSQLEXPORT_DB_USER_PASSWORD set fact from env if possible
+  set_fact:
+    MYSQLEXPORT_DB_USER_PASSWORD: "{{ lookup('env', 'MYSQLEXPORT_DB_USER_PASSWORD') | default('') | trim }}"
+  when: lookup('env', 'MYSQLEXPORT_DB_USER_PASSWORD') | default('', true) | trim != ''
+- name: MYSQLEXPORT_DB_USER_PASSWORD prompt user input if unset
+  pause:
+    prompt: "SET MYSQLEXPORT_DB_USER_PASSWORD"
+    echo: yes
+  register: input
+  when: MYSQLEXPORT_DB_USER_PASSWORD is not defined
+- name: Set MYSQLEXPORT_DB_USER_PASSWORD fact from user input
+  set_fact:
+    MYSQLEXPORT_DB_USER_PASSWORD: "{{ input.user_input | default('') | trim }}"
+  when: MYSQLEXPORT_DB_USER_PASSWORD is not defined
+
+# MYSQLEXPORT_DESTINATION_FOLDER
+# Where the MySQL export should be placed on the local filesystem
+- name: MYSQLEXPORT_DESTINATION_FOLDER set fact from env if possible
+  set_fact:
+    MYSQLEXPORT_DESTINATION_FOLDER: "{{ lookup('env', 'MYSQLEXPORT_DESTINATION_FOLDER') | default('') | trim }}"
+  when: lookup('env', 'MYSQLEXPORT_DESTINATION_FOLDER') | default('', true) | trim != ''
+- name: MYSQLEXPORT_DESTINATION_FOLDER prompt user input if unset
+  pause:
+    prompt: "SET MYSQLEXPORT_DESTINATION_FOLDER"
+    echo: yes
+  register: input
+  when: MYSQLEXPORT_DESTINATION_FOLDER is not defined
+- name: Set MYSQLEXPORT_DESTINATION_FOLDER fact from user input
+  set_fact:
+    MYSQLEXPORT_DESTINATION_FOLDER: "{{ input.user_input | default('') | trim }}"
+  when: MYSQLEXPORT_DESTINATION_FOLDER is not defined
+
+
+###############################################################################
+############################ ROLE IMPLEMENTATION ##############################
+###############################################################################
+
+
+# Step 1: Dump the database from the target system
+
+- name: Dump MySQL Database
+  shell: "mysqldump -u{{ MYSQLEXPORT_DB_USER }} -p{{ MYSQLEXPORT_DB_USER_PASSWORD }} {{ MYSQLEXPORT_DB_NAME }} > /tmp/mysql_dump_{{ MYSQLEXPORT_DB_NAME }}.sql"
+  no_log: false
+
+# Step 2: Copy the dump file to host machine
+
+- name: Sync files from target to host
+  synchronize:
+    src: "/tmp/mysql_dump_{{ MYSQLEXPORT_DB_NAME }}.sql"
+    dest: "{{ MYSQLEXPORT_DESTINATION_FOLDER }}"
+    mode: pull
+  become: yes
+
+# Step 3: Cleanup/Remove Dump File from Target
+
+- name: Remove Dump File from Target
+  file:
+    path: "/tmp/mysql_dump_{{ MYSQLEXPORT_DB_NAME }}.sql"
+    state: absent
